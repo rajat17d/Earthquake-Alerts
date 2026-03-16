@@ -1,15 +1,22 @@
 name: Earthquake Check
 on:
   schedule:
-    - cron: '*/10 * * * *' # Every 10 minutes
-  workflow_dispatch:      # Allows manual testing
+    - cron: '*/10 * * * *' # Runs every 10 minutes
+  workflow_dispatch:      # Allows you to click "Run workflow" manually
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4 # Updated from v3 to v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5 # Updated from v4 to v5
         with:
-          python-version: '3.9'
-      - run: pip install -r requirements.txt
-      - run: python monitor.py
+          python-version: '3.11'
+          
+      - name: Install Requirements
+        run: pip install requests
+        
+      - name: Run Monitor
+        run: python monitor.py
