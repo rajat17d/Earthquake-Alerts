@@ -1,7 +1,7 @@
 import requests
 import math
 
-# --- 1. FULL TEAMS WORKFLOW URL ---
+# --- 1. CONFIGURATION ---
 TEAMS_WORKFLOW_URL = "https://defaultfe1d95a94ce141a58eab6dd43aa26d.9f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/c2bbf7a14d584876a3b81a8a7fbedbac/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=20YX9Mf323evgcxN68y6fdUcQWBdLxbtuEUJsnP1bcU"
 
 OFFICES = [
@@ -27,38 +27,42 @@ def haversine(lat1, lon1, lat2, lon2):
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
 def send_alert(office, mag, dist, place):
-    # This format is required for Power Automate Workflows
-    payload = {"text": f"⚠️ EARTHQUAKE ALERT\n\nSite: {office['site']} ({office['state']})\nMagnitude: {mag}\nDistance: {dist:.1f} km\nEpicenter: {place}"}
-    try:
-        r = requests.post(TEAMS_WORKFLOW_URL, json=payload, timeout=10)
-        print(f"Teams Status: {r.status_code}")
-    except Exception as e:
-        print(f"Teams Error: {e}")
+    # This matches the "Adaptive Card" requirement of your Power Automate flow
+    payload = {
+        "type": "message",
+        "attachments":},
+                        {"name": "Site Office:", "value": office['site']},
+                        {"title": "Property:", "value": office['prop']},
+                        {"title": "Capacity:", "value": str(office['capacity'])},
+                        {"title": "Magnitude:", "value": str(mag)},
+                        {"title": "Distance:", "value": f"{dist:.1f} km"},
+                        {"title": "Location:", "value": place}
+                    ]}
+                ],
+                "$schema": "http://adaptivecards.io",
+                "version": "1.4"
+            }
+        }]
+    }
+    r = requests.post(TEAMS_WORKFLOW_URL, json=payload)
+    print(f"Workflow Status: {r.status_code}")
 
 def check_quakes():
+    # TEST: Using past day to guarantee we find a sample quake for your first alert
     url = "https://earthquake.usgs.gov"
-    try:
-        response = requests.get(url, timeout=15)
-        if response.status_code != 200: return
-        data = response.json()
-        
-        for event in data.get('features', []):
-            mag = event['properties'].get('mag')
-            place = event['properties'].get('place')
-            coords = event['geometry']['coordinates'] # [longitude, latitude, depth]
-            
-            # --- FIX: Extract Lat and Lon correctly from USGS list ---
-            eq_lon = coords[0]
-            eq_lat = coords[1]
+    data = requests.get(url).json()
+    
+    for event in data.get('features', []):
+        mag = event['properties'].get('mag')
+        place = event['properties'].get('place')
+        lon, lat, depth = event['geometry']['coordinates']
 
-            for office in OFFICES:
-                dist = haversine(office['lat'], office['lon'], eq_lat, eq_lon)
-                # FORCED TEST: Set dist to 20000 and mag to 0.1 for the FIRST RUN
-                if dist <= 20000 and mag and mag >= 0.1:
-                    send_alert(office, mag, dist, place)
-                    return # Send just one for the test
-    except Exception as e:
-        print(f"Error: {e}")
+        for office in OFFICES:
+            dist = haversine(office['lat'], office['lon'], lat, lon)
+            # TEST MODE: 20000km so it triggers immediately
+            if dist <= 20000 and mag and mag >= 0.1:
+                send_alert(office, mag, dist, place)
+                return # Stop after sending the test alert
 
 if __name__ == "__main__":
     check_quakes()
