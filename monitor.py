@@ -2,7 +2,7 @@ import requests
 import math
 
 # --- 1. CONFIGURATION ---
-TEAMS_WEBHOOK_URL = "https://defaultfe1d95a94ce141a58eab6dd43aa26d.9f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/c2bbf7a14d584876a3b81a8a7fbedbac/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=20YX9Mf323evgcxN68y6fdUcQWBdLxbtuEUJsnP1bcU"
+TEAMS_WEBHOOK_URL = "https://rilcloud.webhook.office.com/webhookb2/8afc6530-cf1c-4355-9a99-5867d84e87b0@fe1d95a9-4ce1-41a5-8eab-6dd43aa26d9f/IncomingWebhook/500056a107ac4d02ba1463c798ef4372/8726cf75-4eee-40ac-8179-e36f286fbba6/V2pKR-d1Pmg2FH0fGKG0lOrAKjrGUEwlwYij0bhzREdok1"
 
 OFFICES = [
     {"state": "ANDHRA PRADESH", "site": "Vijaywada", "prop": "RENTED", "lat": 16.54228, "lon": 80.79144, "capacity": 165},
@@ -27,39 +27,40 @@ def haversine(lat1, lon1, lat2, lon2):
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
 def send_teams_alert(office, mag, dist, place):
-    # This format is required for Power Automate Workflows
-    alert_text = (
-        f"⚠️ EARTHQUAKE ALERT\n\n"
-        f"State: {office['state']}\n"
-        f"Site Office: {office['site']}\n"
-        f"Property Type: {office['prop']}\n"
-        f"Seating Capacity: {office['capacity']}\n"
-        f"Magnitude: {mag}\n"
-        f"Distance: {dist:.1f} km\n"
-        f"Epicenter: {place}"
-    )
-    # Power Automate often expects a JSON object with a key named "text"
-    requests.post(TEAMS_WEBHOOK_URL, json={"text": alert_text})
+    # This is the "Actionable Message" format for Connectors
+    payload = {
+        "summary": "Earthquake Alert",
+        "sections": [{
+            "activityTitle": "⚠️ EARTHQUAKE ALERT",
+            "activitySubtitle": f"Magnitude {mag} - {place}",
+            "facts": [
+                {"name": "State", "value": office['state']},
+                {"name": "Site", "value": office['site']},
+                {"name": "Property", "value": office['prop']},
+                {"name": "Capacity", "value": str(office['capacity'])},
+                {"name": "Distance", "value": f"{dist:.1f} km"}
+            ],
+            "markdown": True
+        }]
+    }
+    r = requests.post(TEAMS_WEBHOOK_URL, json=payload)
+    print(f"Teams Response: {r.status_code}") # This helps us debug in GitHub
 
 def check_quakes():
-    # Fetching only the last hour of data
     url = "https://earthquake.usgs.gov"
-    try:
-        data = requests.get(url).json()
-        for event in data.get('features', []):
-            mag = event['properties'].get('mag')
-            place = event['properties'].get('place')
-            coords = event['geometry']['coordinates'] # [lon, lat]
-            
-            for office in OFFICES:
-                # IMPORTANT: USGS uses [lon, lat]. Haversine needs [lat, lon].
-                dist = haversine(office['lat'], office['lon'], coords[1], coords[0])
-                
-                # SETTINGS: Within 500km and Mag > 2.0 (Lowered for testing)
-                if dist <= 20000 and mag and mag >= 0.1:
-                    send_teams_alert(office, mag, dist, place)
-    except Exception as e:
-        print(f"Error: {e}")
+    data = requests.get(url).json()
+    
+    for event in data.get('features', []):
+        mag = event['properties'].get('mag')
+        place = event['properties'].get('place')
+        coords = event['geometry']['coordinates'] # [lon, lat]
+        
+        for office in OFFICES:
+            # We use 20000km and 0.1 mag for the FIRST TEST ONLY
+            dist = haversine(office['lat'], office['lon'], coords[1], coords[0])
+            if dist <= 20000 and mag and mag >= 0.1: 
+                send_teams_alert(office, mag, dist, place)
+                return # Just send ONE for the test
 
 if __name__ == "__main__":
     check_quakes()
