@@ -1,7 +1,9 @@
 import requests
 import math
+import sys
 
 # --- 1. CONFIGURATION ---
+
 TEAMS_WORKFLOW_URL = "https://defaultfe1d95a94ce141a58eab6dd43aa26d.9f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/c2bbf7a14d584876a3b81a8a7fbedbac/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=20YX9Mf323evgcxN68y6fdUcQWBdLxbtuEUJsnP1bcU"
 
 OFFICES = [
@@ -27,42 +29,62 @@ def haversine(lat1, lon1, lat2, lon2):
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
 def send_alert(office, mag, dist, place):
-    # This matches the "Adaptive Card" requirement of your Power Automate flow
-    payload = {
+    # This structure is designed for the "Adaptive Card" variable in your Power Automate flow
+    card_body = {
         "type": "message",
-        "attachments":},
-                        {"name": "Site Office:", "value": office['site']},
-                        {"title": "Property:", "value": office['prop']},
-                        {"title": "Capacity:", "value": str(office['capacity'])},
+        "attachments":)},
+                        {"title": "Office:", "value": str(office['site'])},
                         {"title": "Magnitude:", "value": str(mag)},
                         {"title": "Distance:", "value": f"{dist:.1f} km"},
-                        {"title": "Location:", "value": place}
+                        {"title": "Location:", "value": str(place)},
+                        {"title": "Capcity:", "value": str(office['capacity'])}
                     ]}
                 ],
                 "$schema": "http://adaptivecards.io",
-                "version": "1.4"
+                "version": "1.0"
             }
         }]
     }
-    r = requests.post(TEAMS_WORKFLOW_URL, json=payload)
-    print(f"Workflow Status: {r.status_code}")
+    try:
+        r = requests.post(TEAMS_WORKFLOW_URL, json=card_body, timeout=10)
+        print(f"Workflow Response: {r.status_code}")
+    except Exception as e:
+        print(f"Failed to reach Teams: {e}")
 
 def check_quakes():
-    # TEST: Using past day to guarantee we find a sample quake for your first alert
     url = "https://earthquake.usgs.gov"
-    data = requests.get(url).json()
-    
-    for event in data.get('features', []):
+    try:
+        response = requests.get(url, timeout=20)
+        data = response.json()
+        
+        features = data.get('features', [])
+        if not features:
+            print("No earthquakes found today.")
+            return
+
+        # Let's take the most recent earthquake for the test
+        event = features[0]
         mag = event['properties'].get('mag')
         place = event['properties'].get('place')
-        lon, lat, depth = event['geometry']['coordinates']
+        coords = event['geometry'].get('coordinates', [])
+        
+        if len(coords) >= 2:
+            eq_lon = coords[0]
+            eq_lat = coords[1]
+            
+            for office in OFFICES:
+                dist = haversine(office['lat'], office['lon'], eq_lat, eq_lon)
+                # TEST: 20000km to force an alert
+                if dist <= 20000 and mag and mag >= 0.1:
+                    print(f"Triggering test alert for: {office['site']}")
+                    send_alert(office, mag, dist, place)
+                    return # Exit after one alert
+        else:
+            print("Invalid coordinates in data.")
 
-        for office in OFFICES:
-            dist = haversine(office['lat'], office['lon'], lat, lon)
-            # TEST MODE: 20000km so it triggers immediately
-            if dist <= 20000 and mag and mag >= 0.1:
-                send_alert(office, mag, dist, place)
-                return # Stop after sending the test alert
+    except Exception as e:
+        print(f"CRITICAL ERROR: {e}")
+        sys.exit(1) # This sends the Exit Code 1 back to GitHub
 
 if __name__ == "__main__":
     check_quakes()
