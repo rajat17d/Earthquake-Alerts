@@ -59,9 +59,10 @@ def check_quakes():
     for event in data['features']:
         mag = event['properties']['mag']
         place = event['properties']['place']
-        # USGS coordinates are [longitude, latitude]
-        eq_lon = event['geometry']['coordinates'][0]
-        eq_lat = event['geometry']['coordinates'][1]
+        # USGS coordinates are [longitude, latitude, depth]
+       coords = event['geometry']['coordinates']
+        eq_lon = coords[0]
+        eq_lat = coords[1]
 
         for office in OFFICES:
             dist = haversine(office['lat'], office['lon'], eq_lat, eq_lon)
