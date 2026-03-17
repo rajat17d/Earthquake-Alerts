@@ -68,9 +68,9 @@ def main():
             eq_lat = coords[1]
             for office in OFFICES:
                 dist = haversine(office['lat'], office['lon'], eq_lat, eq_lon)
-                if dist <= 10000 and mag and mag >= 4.0:
+                if dist <= 1000 and mag and mag >= 4.0:
                     send_alert(office, mag, dist, place)
-                    return
+
                     
     except Exception as e:
         print(f"Error: {e}")
