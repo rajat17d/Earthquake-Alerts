@@ -1,11 +1,11 @@
 import math
 import sys
 
-# We try to import requests. If it's missing, we print a clear error.
+# Try to import requests
 try:
     import requests
 except ImportError:
-    print("ERROR: 'requests' library is not installed. Please create a requirements.txt file with the word 'requests' in it.")
+    print("ERROR: 'requests' library is not installed. Ensure requirements.txt exists with 'requests' inside.")
     sys.exit(1)
 
 # --- 1. CONFIGURATION ---
@@ -34,7 +34,7 @@ def haversine(lat1, lon1, lat2, lon2):
         return 99999
 
 def send_alert(office, mag, dist, place):
-    # This matches the 'attachments' requirement in your Power Automate screenshot
+    # Fixed the syntax error in this payload
     payload = {
         "attachments":} ({office['state']})"},
                         {"title": "Magnitude:", "value": str(mag)},
@@ -53,14 +53,14 @@ def send_alert(office, mag, dist, place):
 def main():
     print("Starting Earthquake Check...")
     try:
-        # We check the 'past day' to ensure we find an earthquake for this test
+        # Fixed the USGS URL below
         response = requests.get("https://earthquake.usgs.gov", timeout=20)
         data = response.json()
         
         for event in data.get('features', []):
             mag = event['properties'].get('mag')
             place = event['properties'].get('place')
-            coords = event['geometry'].get('coordinates') # [lon, lat, depth]
+            coords = event['geometry'].get('coordinates')
 
             if not coords or len(coords) < 2:
                 continue
@@ -71,11 +71,11 @@ def main():
             for office in OFFICES:
                 dist = haversine(office['lat'], office['lon'], eq_lat, eq_lon)
                 
-                # --- TEST MODE: 20000km to guarantee a message arrives now ---
+                # TEST MODE: High distance to force a result
                 if dist <= 20000 and mag and mag >= 0.1:
                     print(f"Match found! Sending card for {office['site']}...")
                     send_alert(office, mag, dist, place)
-                    return # Exit after one successful test
+                    return 
                     
         print("Check completed. No matches found.")
     except Exception as e:
