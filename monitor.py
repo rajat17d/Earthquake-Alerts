@@ -70,6 +70,7 @@ def main():
                 dist = haversine(office['lat'], office['lon'], eq_lat, eq_lon)
                 if dist <= 20000 and mag and mag >= 0.1:
                     send_alert(office, mag, dist, place)
+                    return
                     
     except Exception as e:
         print(f"Error: {e}")
