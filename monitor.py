@@ -1,5 +1,6 @@
 import math
 import sys
+import json
 
 # Try to import requests
 try:
@@ -25,35 +26,33 @@ OFFICES = [
 ]
 
 def haversine(lat1, lon1, lat2, lon2):
-    try:
-        R = 6371
-        dlat, dlon = math.radians(lat2-lat1), math.radians(lon2-lon1)
-        a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
-        return 2 * R * math.asin(math.sqrt(a))
-    except:
-        return 99999
+    R = 6371
+    dlat, dlon = math.radians(lat2-lat1), math.radians(lon2-lon1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+    return 2 * R * math.asin(math.sqrt(a))
 
 def send_alert(office, mag, dist, place):
-    # Fixed the syntax error in this payload
+    # This structure is specifically for the "Initialize variable (Attachments)" step in your Flow
     payload = {
         "attachments":} ({office['state']})"},
-                        {"title": "Magnitude:", "value": str(mag)},
-                        {"title": "Distance:", "value": f"{dist:.1f} km"},
-                        {"title": "Location:", "value": str(place)},
-                        {"title": "Risk Capacity:", "value": str(office['capacity'])}
-                    ]}
-                ],
-                "$schema": "http://adaptivecards.io"
+                            {"title": "Magnitude:", "value": str(mag)},
+                            {"title": "Distance:", "value": f"{dist:.1f} km"},
+                            {"title": "Location:", "value": str(place)},
+                            {"title": "Risk Capacity:", "value": str(office['capacity'])}
+                        ]}
+                    ],
+                    "$schema": "http://adaptivecards.io"
+                }
             }
-        }]
+        ]
     }
     r = requests.post(URL, json=payload)
-    print(f"Teams Response: {r.status_code}")
+    print(f"Teams Status: {r.status_code}")
 
 def main():
-    print("Starting Earthquake Check...")
+    print("Checking USGS earthquake feed...")
     try:
-        # Fixed the USGS URL below
+        # Fetching past 24 hours of data to guarantee a test alert
         response = requests.get("https://earthquake.usgs.gov", timeout=20)
         data = response.json()
         
@@ -71,15 +70,16 @@ def main():
             for office in OFFICES:
                 dist = haversine(office['lat'], office['lon'], eq_lat, eq_lon)
                 
-                # TEST MODE: High distance to force a result
+                # --- TEST MODE --- 
+                # (Triggers for ANY global quake in last 24h to verify your Teams connection)
                 if dist <= 20000 and mag and mag >= 0.1:
                     print(f"Match found! Sending card for {office['site']}...")
                     send_alert(office, mag, dist, place)
                     return 
                     
-        print("Check completed. No matches found.")
+        print("Done. No matching earthquakes found.")
     except Exception as e:
-        print(f"CRITICAL SCRIPT ERROR: {e}")
+        print(f"Script Error: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
