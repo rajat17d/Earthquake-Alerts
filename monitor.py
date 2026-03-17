@@ -54,7 +54,7 @@ def send_alert(office, mag, dist, place):
     print(f"Alert sent to {office['site']} — Status Code: {r.status_code}")
 
 def main():
-    api_url = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=100&minmagnitude=0.1"
+    api_url = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=100&minmagnitude=4.0"
     try:
         response = requests.get(api_url, timeout=15)
         data = response.json()
@@ -68,7 +68,7 @@ def main():
             eq_lat = coords[1]
             for office in OFFICES:
                 dist = haversine(office['lat'], office['lon'], eq_lat, eq_lon)
-                if dist <= 20000 and mag and mag >= 0.1:
+                if dist <= 10000 and mag and mag >= 4.0:
                     send_alert(office, mag, dist, place)
                     return
                     
