@@ -27,14 +27,13 @@ def haversine(lat1, lon1, lat2, lon2):
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
 def send_to_teams(office, mag, dist, place):
-    # This JSON structure is EXACTLY what your "For each 1" loop is looking for
+    # This structure satisfies the 'attachments' loop in your Power Automate
     payload = {
-        "attachments":},
-                            {"title": "Office Site:", "value": office['site']},
+        "attachments":)},
+                            {"title": "Office:", "value": str(office['site'])},
                             {"title": "Magnitude:", "value": str(mag)},
                             {"title": "Distance:", "value": f"{dist:.1f} km"},
-                            {"title": "Seating Capacity:", "value": str(office['capacity'])},
-                            {"title": "Location:", "value": place}
+                            {"title": "Location:", "value": str(place)}
                         ]}
                     ],
                     "$schema": "http://adaptivecards.io"
@@ -43,29 +42,43 @@ def send_to_teams(office, mag, dist, place):
         ]
     }
     r = requests.post(URL, json=payload)
-    print(f"Workflow Status: {r.status_code}")
+    print(f"Teams Workflow Status: {r.status_code}")
 
-def check_quakes():
-    # TEST MODE: Checking 'past day' to guarantee a result for your first run
-    feed = "https://earthquake.usgs.gov"
+def main():
     try:
-        data = requests.get(feed).json()
-        for event in data.get('features', []):
+        # TEST MODE: Checking 'past day' to ensure we find a test case
+        feed = "https://earthquake.usgs.gov"
+        print("Fetching USGS data...")
+        response = requests.get(feed, timeout=15)
+        data = response.json()
+        
+        features = data.get('features', [])
+        print(f"Found {len(features)} earthquakes to check.")
+
+        for event in features:
             mag = event['properties'].get('mag')
             place = event['properties'].get('place')
-            coords = event['geometry']['coordinates'] # [longitude, latitude]
+            coords = event.get('geometry', {}).get('coordinates', [])
 
-            for office in OFFICES:
-                dist = haversine(office['lat'], office['lon'], coords[1], coords[0])
-                
-                # --- TEST SETTINGS ---
-                # Change 20000 back to 250 and 0.1 back to 4.0 after this works!
-                if dist <= 20000 and mag and mag >= 0.1:
-                    print(f"Match found! Sending alert for {office['site']}...")
-                    send_to_teams(office, mag, dist, place)
-                    return # Exit after sending the first test card
+            # USGS coordinates are [longitude, latitude]
+            if len(coords) >= 2:
+                eq_lon = coords[0]
+                eq_lat = coords[1]
+
+                for office in OFFICES:
+                    dist = haversine(office['lat'], office['lon'], eq_lat, eq_lon)
+                    
+                    # TEST TRIGGER: Global distance and tiny magnitude
+                    if dist <= 20000 and mag is not None and mag >= 0.1:
+                        print(f"Match found for {office['site']}! Sending card...")
+                        send_to_teams(office, mag, dist, place)
+                        return # stop after one test alert
+        
+        print("Completed check. No matches found.")
+
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"ERROR: {str(e)}")
+        exit(1) # This tells GitHub that the script failed
 
 if __name__ == "__main__":
-    check_quakes()
+    main()
