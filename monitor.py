@@ -147,21 +147,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-```
-
----
-
-## What Changed & Why
-
-| Area | Old Behaviour | New Behaviour |
-|------|--------------|---------------|
-| `send_alert()` | One POST per office match | Replaced by `send_combined_alert()` — **one POST total** |
-| Card format | `FactSet` (key-value pairs) | `Table` with header row + data rows |
-| Match collection | Triggered alert immediately | All matches collected first, then one card sent |
-| Empty result | Silent | Prints `No offices within risk zone` |
-| Thresholds | 20,000 km / mag 0.1 | **500 km / mag 4.0** |
-
-## Power Automate — No Changes Needed ✅
-The outer payload structure is identical:
-```
-attachments → contentType → content (AdaptiveCard)
