@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 # --- 1. CONFIGURATION ---
 URL     = os.environ["POWERAUTOMATE_URL"]
 PAT     = os.environ["DATA_PAT"]
-csv_url = "https://raw.githubusercontent.com/rajat17d/earthquake-monitor/main/offices.csv"
+csv_url = "https://raw.githubusercontent.com/rajat17d/earthquake-monitor/main/Offices.csv"
 
 # Alert thresholds
 TIER1_MAG = 6.0;  TIER1_DIST = 300
