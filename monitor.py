@@ -5,7 +5,7 @@ import os
 import io
 import json
 import pandas as pd
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # --- 1. CONFIGURATION ---
 URL     = os.environ["POWERAUTOMATE_URL"]
@@ -138,6 +138,13 @@ def main():
         OFFICES = pd.read_csv(io.StringIO(resp.text)).to_dict(orient="records")
         print(f"Offices loaded: {len(OFFICES)}")
 
+        # Build 24-hour time window
+        start_time = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
+        api_url = (
+            f"https://earthquake.usgs.gov/fdsnws/event/1/query"
+            f"?format=geojson&limit=50&minmagnitude=4.8&orderby=time&starttime={start_time}"
+        )
+        
         # Fetch USGS data
         api_url  = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=20&minmagnitude=4.8&orderby=time"
         print("Fetching earthquake data from USGS...")
