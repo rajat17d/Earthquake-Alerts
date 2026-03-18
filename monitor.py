@@ -6,6 +6,7 @@ import io
 import json
 import pandas as pd
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 # --- 1. CONFIGURATION ---
 URL     = os.environ["POWERAUTOMATE_URL"]
@@ -50,7 +51,7 @@ def get_tier(mag, dist, depth):
 
 # --- 5. ALL CLEAR NOTIFICATION ---
 def send_all_clear():
-    timestamp = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
+    timestamp = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %H:%M IST")
     payload = {
         "attachments": [{
             "contentType": "application/vnd.microsoft.card.adaptive",
@@ -86,7 +87,7 @@ def send_all_clear():
 
 # --- 6. ALERT NOTIFICATION ---
 def send_combined_alert(tier1_matches, tier2_matches):
-    timestamp = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
+    timestamp = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %H:%M IST")
     total     = len(tier1_matches) + len(tier2_matches)
 
     def make_rows(matches, row_style):
@@ -119,7 +120,7 @@ def send_combined_alert(tier1_matches, tier2_matches):
                 "body": [
                     {
                         "type": "TextBlock",
-                        "text": "Earthquake Alert - Offices Within Risk Zone",
+                        "text": "🚨 Earthquake Alert - Offices Within Risk Zone",
                         "weight": "Bolder", "size": "Large", "color": "Attention", "wrap": True
                     },
                     {
