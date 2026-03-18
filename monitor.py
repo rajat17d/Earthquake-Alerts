@@ -188,7 +188,43 @@ def main():
             seen_ids.update(new_ids)
             save_seen_ids(seen_ids)
         else:
-            print("No offices within risk zone. No alert sent.")
+            send_all_clear()
+
+    def send_all_clear():
+    timestamp = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
+    payload = {
+        "attachments": [{
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "content": {
+                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                "type": "AdaptiveCard",
+                "version": "1.5",
+                "body": [
+                    {
+                        "type": "TextBlock",
+                        "text": "✅ Earthquake Monitor — All Clear",
+                        "weight": "Bolder", "size": "Large", "color": "Good", "wrap": True
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": "No offices are currently within the earthquake risk zone.",
+                        "wrap": True, "spacing": "Small"
+                    },
+                    {
+                        "type": "FactSet",
+                        "facts": [
+                            {"title": "Checked:",    "value": timestamp},
+                            {"title": "Criteria:",   "value": "Mag 6.0+ within 300km  |  Mag 5.0+ within 200km"},
+                            {"title": "EQ Scanned:", "value": "Last 24 hours globally"}
+                        ]
+                    }
+                ]
+            }
+        }]
+    }
+    r = requests.post(URL, json=payload, timeout=10)
+    print(f"All Clear sent | Status: {r.status_code} | {timestamp}")
+
 
     except requests.exceptions.ConnectionError:
         print("Network error — cannot reach API")
