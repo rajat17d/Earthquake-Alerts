@@ -12,13 +12,13 @@ URL     = os.environ["POWERAUTOMATE_URL"]
 PAT     = os.environ["DATA_PAT"]
 csv_url = "https://raw.githubusercontent.com/rajat17d/earthquake-monitor/main/Offices.csv"
 
-# Alert thresholds
 TIER1_MAG = 6.0;  TIER1_DIST = 300
 TIER2_MAG = 5.0;  TIER2_DIST = 200
 TIER2_FAR_MAG = 6.0; TIER2_FAR_DIST_MIN = 300; TIER2_FAR_DIST_MAX = 500
 
 SEEN_IDS_FILE = "seen_events.json"
 
+# --- 2. DEDUPLICATION ---
 def load_seen_ids():
     try:
         with open(SEEN_IDS_FILE, "r") as f:
@@ -30,6 +30,7 @@ def save_seen_ids(ids):
     with open(SEEN_IDS_FILE, "w") as f:
         json.dump(list(ids), f)
 
+# --- 3. DISTANCE CALCULATOR ---
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371
     dlat = math.radians(lat2 - lat1)
@@ -37,6 +38,7 @@ def haversine(lat1, lon1, lat2, lon2):
     a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
     return 2 * R * math.asin(math.sqrt(a))
 
+# --- 4. TIER CLASSIFIER ---
 def get_tier(mag, dist, depth):
     depth_label = "Shallow" if depth < 70 else ("Intermediate" if depth < 300 else "Deep")
     if mag >= TIER1_MAG and dist <= TIER1_DIST:
@@ -46,6 +48,43 @@ def get_tier(mag, dist, depth):
         return 2, "WATCH ALERT", "warning", depth_label
     return None, None, None, depth_label
 
+# --- 5. ALL CLEAR NOTIFICATION ---
+def send_all_clear():
+    timestamp = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
+    payload = {
+        "attachments": [{
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "content": {
+                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                "type": "AdaptiveCard",
+                "version": "1.5",
+                "body": [
+                    {
+                        "type": "TextBlock",
+                        "text": "✅ Earthquake Monitor — All Clear",
+                        "weight": "Bolder", "size": "Large", "color": "Good", "wrap": True
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": "No offices are currently within the earthquake risk zone.",
+                        "wrap": True, "spacing": "Small"
+                    },
+                    {
+                        "type": "FactSet",
+                        "facts": [
+                            {"title": "Checked:",    "value": timestamp},
+                            {"title": "Criteria:",   "value": "Mag 6.0+ within 300km  |  Mag 5.0+ within 200km"},
+                            {"title": "EQ Scanned:", "value": "Last 24 hours globally"}
+                        ]
+                    }
+                ]
+            }
+        }]
+    }
+    r = requests.post(URL, json=payload, timeout=10)
+    print(f"All Clear sent | Status: {r.status_code} | {timestamp}")
+
+# --- 6. ALERT NOTIFICATION ---
 def send_combined_alert(tier1_matches, tier2_matches):
     timestamp = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
     total     = len(tier1_matches) + len(tier2_matches)
@@ -125,63 +164,28 @@ def send_combined_alert(tier1_matches, tier2_matches):
     r = requests.post(URL, json=payload, timeout=10)
     print(f"Alert sent — {total} match(es) | Status: {r.status_code}")
 
-def send_all_clear():
-timestamp = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
-payload = {
-    "attachments": [{
-        "contentType": "application/vnd.microsoft.card.adaptive",
-        "content": {
-            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-            "type": "AdaptiveCard",
-            "version": "1.5",
-            "body": [
-                {
-                    "type": "TextBlock",
-                    "text": "✅ Earthquake Monitor — All Clear",
-                    "weight": "Bolder", "size": "Large", "color": "Good", "wrap": True
-                },
-                {
-                    "type": "TextBlock",
-                    "text": "No offices are currently within the earthquake risk zone.",
-                    "wrap": True, "spacing": "Small"
-                },
-                {
-                    "type": "FactSet",
-                    "facts": [
-                        {"title": "Checked:",    "value": timestamp},
-                        {"title": "Criteria:",   "value": "Mag 6.0+ within 300km  |  Mag 5.0+ within 200km"},
-                        {"title": "EQ Scanned:", "value": "Last 24 hours globally"}
-                    ]
-                }
-            ]
-        }
-    }]
-}
-r = requests.post(URL, json=payload, timeout=10)
-print(f"All Clear sent | Status: {r.status_code} | {timestamp}")
-
+# --- 7. MAIN ---
 def main():
     seen_ids = load_seen_ids()
     new_ids  = set()
 
     try:
-        # Load offices from private repo
         resp = requests.get(csv_url, headers={"Authorization": f"token {PAT}"}, timeout=10)
         if resp.status_code != 200:
-            print(f"Failed to fetch offices.csv — Status: {resp.status_code}")
+            print(f"Failed to fetch Offices.csv — Status: {resp.status_code}")
             sys.exit(1)
-        OFFICES = pd.read_csv(io.StringIO(resp.text)).to_dict(orient="records")
+        df = pd.read_csv(io.StringIO(resp.text))
+        df.columns = df.columns.str.strip().str.lower()
+        print(f"CSV columns detected: {list(df.columns)}")
+        OFFICES = df.to_dict(orient="records")
         print(f"Offices loaded: {len(OFFICES)}")
 
-        # Build 24-hour time window
         start_time = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
         api_url = (
             f"https://earthquake.usgs.gov/fdsnws/event/1/query"
             f"?format=geojson&limit=50&minmagnitude=4.8&orderby=time&starttime={start_time}"
         )
-        
-        # Fetch USGS data
-        api_url  = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=20&minmagnitude=4.8&orderby=time"
+
         print("Fetching earthquake data from USGS...")
         response = requests.get(api_url, timeout=15)
         data     = response.json()
@@ -225,8 +229,6 @@ def main():
         else:
             send_all_clear()
 
-
-
     except requests.exceptions.ConnectionError:
         print("Network error — cannot reach API")
         sys.exit(1)
@@ -237,7 +239,7 @@ def main():
         print(f"Bad JSON response: {e}")
         sys.exit(1)
     except KeyError as e:
-        print(f"Missing column in CSV: {e} — check offices.csv headers")
+        print(f"Missing column in CSV: {e} — check Offices.csv headers")
         sys.exit(1)
     except Exception as e:
         print(f"Unexpected error — {type(e).__name__}: {e}")
