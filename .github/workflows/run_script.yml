@@ -1,25 +1,35 @@
 name: Earthquake Check
+
 on:
   schedule:
-    - cron: '*/10 * * * *' # Runs every 10 minutes
-  workflow_dispatch:      # Allows you to click "Run workflow" manually
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4 # Updated from v3 to v4
-      
+        uses: actions/checkout@v4
+
       - name: Setup Python
-        uses: actions/setup-python@v5 # Updated from v4 to v5
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          
+
       - name: Install Requirements
         run: pip install -r requirements.txt
-        
+
       - name: Run Monitor
-      env:
-        POWERAUTOMATE_URL: ${{ secrets.POWERAUTOMATE_URL }}    # Added
-        DATA_PAT:          ${{ secrets.DATA_PAT }}             # Added
+        env:
+          POWERAUTOMATE_URL: ${{ secrets.POWERAUTOMATE_URL }}
+          DATA_PAT:          ${{ secrets.DATA_PAT }}
         run: python monitor.py
+
+      - name: Commit Seen Events
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add seen_events.json
+          git diff --cached --quiet || git commit -m "Update seen events"
+          git push
