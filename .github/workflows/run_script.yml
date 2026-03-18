@@ -16,7 +16,10 @@ jobs:
           python-version: '3.11'
           
       - name: Install Requirements
-        run: pip install requests
+        run: pip install requests pandas
         
       - name: Run Monitor
+      env:
+        POWERAUTOMATE_URL: ${{ secrets.POWERAUTOMATE_URL }}    # Added
+        DATA_PAT:          ${{ secrets.DATA_PAT }}             # Added
         run: python monitor.py
